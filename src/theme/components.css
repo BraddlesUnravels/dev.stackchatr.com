@@ -1,0 +1,15 @@
+@layer base {
+  body {
+    background-color: #0d1117; /* Dark background color */
+    color: #c9d1d9; /* Light text color */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Hide spin buttons in number inputs */
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+}

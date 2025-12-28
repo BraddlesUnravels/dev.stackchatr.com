@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+@import "./theme/theme.css";
+
+@import "./theme/font.css";
+
+@import "./theme/components.css";
+
+@import "./theme/utilities.css";
