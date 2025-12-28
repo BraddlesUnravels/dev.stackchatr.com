@@ -1,2 +1,9 @@
 @layer utilities {
+  .base-layout-container {
+    @apply max-w-screen max-h-screen;
+  }
+
+  .nav-bar {
+    @apply flex gap-4 justify-center items-center cursor-pointer md:gap-8 lg:gap-12;
+  }
 }

@@ -1,6 +1,6 @@
 {
   "name": "dev.stackchatr.com",
-  "description": "Skills showcase site built with Qwik City",
+  "description": "A Qwik City project powered by StackChatr",
   "engines": {
     "node": ">=22.0.0"
   },

@@ -1,17 +1,9 @@
 import { component$ } from "@builder.io/qwik";
+import { BasiPageContainer } from "~/components/layout/lib";
 import type { DocumentHead } from "@builder.io/qwik-city";
 
 export default component$(() => {
-  return (
-    <>
-      <h1>Skills Showcase</h1>
-      <div>
-        This is your starting point for a skills portfolio site.
-        <br />
-        Update this page to highlight your projects, experience, and expertise.
-      </div>
-    </>
-  );
+  return <BasiPageContainer></BasiPageContainer>;
 });
 
 export const head: DocumentHead = {
