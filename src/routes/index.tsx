@@ -1,17 +1,23 @@
 import { component$ } from "@builder.io/qwik";
-import { BasiPageContainer } from "~/components/layout/lib";
+import { LandingHero } from "~/components/landing/hero";
 import type { DocumentHead } from "@builder.io/qwik-city";
+import { PageBaseContainer } from "~/components/layout/lib";
 
 export default component$(() => {
-  return <BasiPageContainer></BasiPageContainer>;
+  return (
+    <PageBaseContainer>
+      <LandingHero />
+    </PageBaseContainer>
+  );
 });
 
 export const head: DocumentHead = {
-  title: "Skills Showcase",
+  title: "Instant, then interactive · Skills Showcase",
   meta: [
     {
       name: "description",
-      content: "A skills portfolio site built with Qwik City.",
+      content:
+        "A Qwik-powered landing page that renders instantly as HTML, then progressively wakes up interactions.",
     },
   ],
 };

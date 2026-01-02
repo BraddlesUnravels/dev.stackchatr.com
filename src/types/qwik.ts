@@ -1,0 +1,22 @@
+import { QwikIntrinsicElements } from "@builder.io/qwik";
+
+export type QDiv = QwikIntrinsicElements["div"];
+export type QSpan = QwikIntrinsicElements["span"];
+export type QButton = QwikIntrinsicElements["button"];
+export type QAnchor = QwikIntrinsicElements["a"];
+export type QMain = QwikIntrinsicElements["main"];
+export type QHeader = QwikIntrinsicElements["header"];
+export type QFooter = QwikIntrinsicElements["footer"];
+export type QSection = QwikIntrinsicElements["section"];
+export type QParagraph = QwikIntrinsicElements["p"];
+export type QImage = QwikIntrinsicElements["img"];
+export type QInput = QwikIntrinsicElements["input"];
+export type QTextArea = QwikIntrinsicElements["textarea"];
+export type QForm = QwikIntrinsicElements["form"];
+export type QLabel = QwikIntrinsicElements["label"];
+export type QUl = QwikIntrinsicElements["ul"];
+export type QLi = QwikIntrinsicElements["li"];
+export type QNav = QwikIntrinsicElements["nav"];
+export type QSvg = QwikIntrinsicElements["svg"];
+export type QSummary = QwikIntrinsicElements["summary"];
+export type QDetails = QwikIntrinsicElements["details"];
