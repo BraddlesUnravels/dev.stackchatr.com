@@ -1,11 +1,12 @@
-import { type Config } from "prettier";
+import { type Config } from 'prettier';
 
 const config: Config = {
-  trailingComma: "none",
+  trailingComma: 'none',
   tabWidth: 2,
   semi: true,
   singleQuote: true,
-  plugins: ["prettier-plugin-tailwindcss"],
+  printWidth: 100,
+  plugins: ['prettier-plugin-tailwindcss']
 };
 
 export default config;

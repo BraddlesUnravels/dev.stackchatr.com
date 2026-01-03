@@ -1,9 +1,9 @@
 @layer utilities {
   .nav-bar {
-    @apply flex gap-4 justify-center items-center md:gap-8 lg:gap-12;
+    @apply flex items-center justify-center gap-4 md:gap-8 lg:gap-12;
   }
 
   .footer {
-    @apply flex min-h-[8] md:flex-row gap-6 justify-center items-center text-xs text-emerald-500 mb-3;
+    @apply mt-4 flex w-full items-center justify-center pb-3 text-xs text-emerald-500 md:flex-row;
   }
 }
