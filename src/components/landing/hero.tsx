@@ -1,7 +1,7 @@
-import { component$, useSignal, useVisibleTask$ } from "@builder.io/qwik";
-import { HeroCopy } from "./hero-copy";
-import { HydrationVisualizer } from "./hydration-visualizer";
-import { getHydrationPhaseDelays } from "./hydration-model";
+import { component$, useSignal, useVisibleTask$ } from '@builder.io/qwik';
+import { HeroCopy } from './hero-copy';
+import { HydrationVisualizer } from './hydration-visualizer';
+import { getHydrationPhaseDelays } from './hydration-model';
 
 export const LandingHero = component$(() => {
   const activePhase = useSignal(0);
@@ -22,12 +22,12 @@ export const LandingHero = component$(() => {
   });
 
   return (
-    <div class="h-full w-full max-w-7xl flex gap-16 justify-center items-center">
+    <>
       <HeroCopy
         clicks={clicks.value}
         onWakeClick$={() => (clicks.value = clicks.value + 1)}
       />
       <HydrationVisualizer activePhase={activePhase.value} />
-    </div>
+    </>
   );
 });
