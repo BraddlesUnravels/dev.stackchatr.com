@@ -1,295 +1,303 @@
 import { component$, useSignal, $, useVisibleTask$ } from '@builder.io/qwik';
 import type { DocumentHead } from '@builder.io/qwik-city';
 import { PageBaseContainer } from '~/components/layout/lib';
-import type { AlgorithmName, Coord, Grid } from '~/utils/pathfinding/types';
+import type { FreeformNode, NodeType } from './components/constants';
 import {
-  createGrid,
-  toggleWall,
-  resetGridState,
-  clearWalls,
-  gridHasVisitedOrPath
-} from '~/utils/pathfinding/grid';
-import { dijkstra } from '~/utils/pathfinding/algorithms/dijkstra';
-import { aStar } from '~/utils/pathfinding/algorithms/a-star';
-import { bfs } from '~/utils/pathfinding/algorithms/bfs';
-import { dfs } from '~/utils/pathfinding/algorithms/dfs';
-import {
-  buildAnimationSteps,
-  getNodesInShortestPathOrder,
-  type AnimationStep
-} from '~/utils/pathfinding/animation';
-import { PathGrid } from './components/path-grid';
-import { OptionsMenu } from './components/button-menu';
-
-const DESKTOP_ROWS = 20;
-const DESKTOP_COLS = 30;
-const MOBILE_ROWS = 10;
-const MOBILE_COLS = 20;
-
-const INITIAL_START: Coord = { row: 5, col: 5 };
-const INITIAL_FINISH: Coord = { row: 5, col: 15 };
+  newNodeId,
+  euclidianDistance,
+  manhattanDistance,
+  findNeighbors,
+  buildDistanceMap
+} from './components/utils';
 
 export default component$(() => {
-  const gridSig = useSignal<Grid>(
-    createGrid({
-      rowCount: DESKTOP_ROWS,
-      colCount: DESKTOP_COLS,
-      start: INITIAL_START,
-      finish: INITIAL_FINISH
-    })
-  );
+  const containerRef = useSignal<HTMLDivElement>();
+  const nodes = useSignal<FreeformNode[]>([]);
+  const startNode = useSignal<FreeformNode | null>(null);
+  const finishNode = useSignal<FreeformNode | null>(null);
 
-  const startSig = useSignal<Coord>({ ...INITIAL_START });
-  const finishSig = useSignal<Coord>({ ...INITIAL_FINISH });
+  const placementMode = useSignal<NodeType>('start');
+  const isDragging = useSignal(false);
+  const draggedNodeId = useSignal<string | null>(null);
+  const dragOffset = useSignal({ x: 0, y: 0 });
+  const wasDragging = useSignal(false);
 
-  const isRunningSig = useSignal(false);
-  const isDesktopViewSig = useSignal(true);
+  // Distance map (not used yet)
+  const distanceMap = useSignal<Map<string, Map<string, number>>>(new Map());
+  const neighborRadius = useSignal(200); // pixels
+  const showConnections = useSignal(false);
 
-  const mouseIsPressedSig = useSignal(false);
-  const modeSig = useSignal<
-    'idle' | 'drag-start' | 'drag-finish' | 'draw-walls'
-  >('idle');
+  // Recompute distances when nodes change
+  const updateDistances$ = $(() => {
+    distanceMap.value = buildDistanceMap(nodes.value);
 
-  const animationStepsSig = useSignal<AnimationStep[] | null>(null);
-  const animationIndexSig = useSignal(0);
-
-  const rebuildGrid = $((rows: number, cols: number) => {
-    gridSig.value = createGrid({
-      rowCount: rows,
-      colCount: cols,
-      start: startSig.value,
-      finish: finishSig.value
-    });
-  });
-
-  const clearGrid$ = $(() => {
-    if (isRunningSig.value) return;
-    gridSig.value = resetGridState(gridSig.value, finishSig.value);
-  });
-
-  const clearWalls$ = $(() => {
-    if (isRunningSig.value) return;
-    gridSig.value = clearWalls(gridSig.value);
-  });
-
-  const toggleView$ = $(() => {
-    if (isRunningSig.value) return;
-
-    clearGrid$();
-    clearWalls$();
-
-    const nextIsDesktop = !isDesktopViewSig.value;
-
-    if (!nextIsDesktop) {
-      const { row: sRow, col: sCol } = startSig.value;
-      const { row: fRow, col: fCol } = finishSig.value;
-      if (
-        sRow >= MOBILE_ROWS ||
-        fRow >= MOBILE_ROWS ||
-        sCol >= MOBILE_COLS ||
-        fCol >= MOBILE_COLS
-      ) {
-        // Qwik-friendly alternative to alert could be a toast; keep simple for now.
-        // eslint-disable-next-line no-alert
-        alert(
-          'Start & Finish nodes must be within 10 rows x 20 columns for mobile view.'
-        );
-        return;
+    if (startNode.value && finishNode.value) {
+      // Log distances for debugging
+      const startDistances = distanceMap.value.get(startNode.value.id);
+      const distToFinish = startDistances?.get(finishNode.value.id);
+      if (distToFinish !== undefined) {
+        console.log(`Direct distance from start to finish: ${distToFinish.toFixed(2)}px`);
       }
     }
-
-    isDesktopViewSig.value = nextIsDesktop;
-    const rows = nextIsDesktop ? DESKTOP_ROWS : MOBILE_ROWS;
-    const cols = nextIsDesktop ? DESKTOP_COLS : MOBILE_COLS;
-    rebuildGrid(rows, cols);
   });
 
-  const handleMouseDown$ = $((row: number, col: number) => {
-    if (isRunningSig.value) return;
-
-    const grid = gridSig.value;
-
-    if (!grid || grid.length === 0) return;
-
-    if (!gridHasVisitedOrPath(grid)) {
-      const node = grid[row][col];
-      if (node.isStart) {
-        modeSig.value = 'drag-start';
-      } else if (node.isFinish) {
-        modeSig.value = 'drag-finish';
-      } else {
-        gridSig.value = toggleWall(grid, row, col);
-        modeSig.value = 'draw-walls';
-      }
-      mouseIsPressedSig.value = true;
-    } else {
-      clearGrid$();
-    }
-  });
-
-  const handleMouseEnter$ = $((row: number, col: number) => {
-    if (isRunningSig.value) return;
-    if (!mouseIsPressedSig.value) return;
-
-    const grid = gridSig.value;
-    const mode = modeSig.value;
-
-    if (mode === 'drag-start') {
-      const currentStart = startSig.value;
-      const prev = grid[currentStart.row][currentStart.col];
-      prev.isStart = false;
-
-      startSig.value = { row, col };
-      const curr = grid[row][col];
-      curr.isStart = true;
-    } else if (mode === 'drag-finish') {
-      const currentFinish = finishSig.value;
-      const prev = grid[currentFinish.row][currentFinish.col];
-      prev.isFinish = false;
-
-      finishSig.value = { row, col };
-      const curr = grid[row][col];
-      curr.isFinish = true;
-    } else if (mode === 'draw-walls') {
-      gridSig.value = toggleWall(grid, row, col);
-    }
-  });
-
-  const handleMouseUp$ = $(() => {
-    if (isRunningSig.value) return;
-    mouseIsPressedSig.value = false;
-    modeSig.value = 'idle';
-    gridSig.value = resetGridState(gridSig.value, finishSig.value);
-  });
-
-  const handleMouseLeave$ = $(() => {
-    mouseIsPressedSig.value = false;
-    modeSig.value = 'idle';
-  });
-
-  const runAlgorithm = $((algo: AlgorithmName) => {
-    if (isRunningSig.value) return;
-
-    clearGrid$();
-
-    const grid = gridSig.value;
-    const startNode = grid[startSig.value.row][startSig.value.col];
-    const finishNode = grid[finishSig.value.row][finishSig.value.col];
-
-    let visited: any[] = [];
-    switch (algo) {
-      case 'Dijkstra':
-        visited = dijkstra(grid, startNode, finishNode);
-        break;
-      case 'AStar':
-        visited = aStar(grid, startNode, finishNode);
-        break;
-      case 'BFS':
-        visited = bfs(grid, startNode, finishNode);
-        break;
-      case 'DFS':
-        visited = dfs(grid, startNode, finishNode);
-        break;
-      default:
-        visited = [];
+  // Place node on click
+  const handleContainerClick$ = $((e: MouseEvent) => {
+    if (!containerRef.value || isDragging.value || wasDragging.value) {
+      wasDragging.value = false;
+      return;
     }
 
-    const shortestPathNodes = getNodesInShortestPathOrder(finishNode);
-    const steps = buildAnimationSteps(visited, shortestPathNodes);
+    const rect = containerRef.value.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
 
-    animationStepsSig.value = steps;
-    animationIndexSig.value = 0;
-    isRunningSig.value = true;
-  });
-
-  const runDijkstra$ = $(() => runAlgorithm('Dijkstra'));
-  const runAStar$ = $(() => runAlgorithm('AStar'));
-  const runBfs$ = $(() => runAlgorithm('BFS'));
-  const runDfs$ = $(() => runAlgorithm('DFS'));
-
-  useVisibleTask$(({ cleanup }) => {
-    let timer: number | undefined;
-
-    const tick = () => {
-      const steps = animationStepsSig.value;
-      if (!steps || !steps.length) return;
-
-      const idx = animationIndexSig.value;
-      if (idx >= steps.length) return;
-
-      const step = steps[idx];
-      const grid = gridSig.value;
-
-      if (step.type === 'visit' || step.type === 'path') {
-        const node = grid[step.row][step.col];
-        if (step.type === 'visit') {
-          node.isVisited = true;
-        } else {
-          node.isInShortestPath = true;
-        }
-      } else if (step.type === 'done') {
-        isRunningSig.value = false;
-        animationStepsSig.value = null;
-        return;
-      }
-
-      animationIndexSig.value = idx + 1;
-      timer = window.setTimeout(tick, step.type === 'visit' ? 10 : 40);
+    const newNode: FreeformNode = {
+      id: newNodeId(),
+      x,
+      y,
+      type: placementMode.value
     };
 
-    if (animationStepsSig.value && isRunningSig.value) {
-      timer = window.setTimeout(tick, 10);
+    // Remove existing start/finish if placing new one
+    if (placementMode.value === 'start') {
+      nodes.value = nodes.value.filter((n) => n.type !== 'start');
+      startNode.value = newNode;
+      placementMode.value = 'finish'; // Switch to finish after placing start
+    } else if (placementMode.value === 'finish') {
+      nodes.value = nodes.value.filter((n) => n.type !== 'finish');
+      finishNode.value = newNode;
     }
 
-    cleanup(() => {
-      if (timer !== undefined) window.clearTimeout(timer);
-    });
+    nodes.value = [...nodes.value, newNode];
+    updateDistances$();
+    console.log(`Node placed at: (${x.toFixed(0)}, ${y.toFixed(0)})`);
   });
 
-  const clearAllAndReset$ = $(() => {
-    if (isRunningSig.value) return;
-    startSig.value = { ...INITIAL_START };
-    finishSig.value = { ...INITIAL_FINISH };
-    const rows = isDesktopViewSig.value ? DESKTOP_ROWS : MOBILE_ROWS;
-    const cols = isDesktopViewSig.value ? DESKTOP_COLS : MOBILE_COLS;
-    gridSig.value = createGrid({
-      rowCount: rows,
-      colCount: cols,
-      start: startSig.value,
-      finish: finishSig.value
-    });
+  // Start dragging
+  const handleNodeMouseDown$ = $((e: MouseEvent, nodeId: string) => {
+    e.stopPropagation();
+    const node = nodes.value.find((n) => n.id === nodeId);
+    if (!node || !containerRef.value) return;
+
+    isDragging.value = true;
+    draggedNodeId.value = nodeId;
+
+    const rect = containerRef.value.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    dragOffset.value = {
+      x: mouseX - node.x,
+      y: mouseY - node.y
+    };
   });
 
-  const grid = gridSig.value;
+  // Deletes any node by given id
+  const deleteNodeById$ = $((nodeId: string) => {
+    nodes.value = nodes.value.filter((n) => n.id !== nodeId);
+
+    if (startNode.value?.id === nodeId) startNode.value = null;
+    if (finishNode.value?.id === nodeId) finishNode.value = null;
+  });
+
+  const updateNodePosition$ = $((nodeId: string, x: number, y: number) => {
+    nodes.value = nodes.value.map((n) => (n.id === nodeId ? { ...n, x, y } : n));
+  });
+
+  // Drag node
+  const handleMouseMove$ = $((e: MouseEvent) => {
+    if (!isDragging.value || !draggedNodeId.value || !containerRef.value) return;
+
+    const rect = containerRef.value.getBoundingClientRect();
+    // Calculate mouse position relative to container
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const x = Math.max(10, Math.min(mouseX - dragOffset.value.x, rect.width - 10));
+    const y = Math.max(10, Math.min(mouseY - dragOffset.value.y, rect.height - 10));
+
+    nodes.value = nodes.value.map((n) => (n.id === draggedNodeId.value ? { ...n, x, y } : n));
+
+    // Update start/finish refs
+    if (startNode.value?.id === draggedNodeId.value) {
+      startNode.value = { ...startNode.value, x, y };
+    }
+    if (finishNode.value?.id === draggedNodeId.value) {
+      finishNode.value = { ...finishNode.value, x, y };
+    }
+  });
+
+  // Stop dragging
+  const handleMouseUp$ = $(() => {
+    if (isDragging.value) {
+      isDragging.value = false;
+      draggedNodeId.value = null;
+      wasDragging.value = true; // Set flag to prevent click dropping a new node
+      updateDistances$();
+    }
+  });
+
+  // Delete node on right-click
+  const handleNodeContextMenu$ = $((e: MouseEvent, nodeId: string) => {
+    e.preventDefault();
+    nodes.value = nodes.value.filter((n) => n.id !== nodeId);
+
+    if (startNode.value?.id === nodeId) startNode.value = null;
+    if (finishNode.value?.id === nodeId) finishNode.value = null;
+  });
+
+  // Clear all
+  const clearAll$ = $(() => {
+    nodes.value = [];
+    startNode.value = null;
+    finishNode.value = null;
+    distanceMap.value = new Map();
+  });
+
+  const getNodeStyle = (node: FreeformNode) => {
+    const baseColors = {
+      start: 'bg-emerald-500',
+      finish: 'bg-rose-500',
+      wall: 'bg-slate-',
+      visited: 'bg-blue-500',
+      path: 'bg-amber-400',
+      normal: 'bg-gray-400'
+    };
+
+    return baseColors[node.type];
+  };
 
   return (
     <PageBaseContainer class="flex flex-col gap-4 text-white">
-      <h1 class="text-3xl font-bold">Pathfinding Visualizer</h1>
-      <OptionsMenu
-        clearGrid$={clearGrid$}
-        clearWalls$={clearWalls$}
-        clearAllAndReset$={clearAllAndReset$}
-        runDijkstra$={runDijkstra$}
-        runAStar$={runAStar$}
-        runBfs$={runBfs$}
-        runDfs$={runDfs$}
-        isDesktopViewSig={isDesktopViewSig}
-        toggleView$={toggleView$}
-      />
+      <h1 class="text-3xl font-bold">Freeform Pathfinding</h1>
 
-      <div class="overflow-x-auto">
-        <PathGrid
-          grid={grid}
-          onMouseDown$={handleMouseDown$}
-          onMouseEnter$={handleMouseEnter$}
-          onMouseUp$={handleMouseUp$}
-          onMouseLeave$={handleMouseLeave$}
-        />
+      {/* Controls */}
+      <div class="flex flex-wrap gap-2">
+        <button
+          class={`rounded px-4 py-2 ${placementMode.value === 'start' ? 'bg-emerald-600' : 'bg-emerald-800'}`}
+          onClick$={() => (placementMode.value = 'start')}
+        >
+          Place Start
+        </button>
+        <button
+          class={`rounded px-4 py-2 ${placementMode.value === 'finish' ? 'bg-rose-600' : 'bg-rose-800'}`}
+          onClick$={() => (placementMode.value = 'finish')}
+        >
+          Place Finish
+        </button>
+        <button
+          class={`rounded px-4 py-2 ${placementMode.value === 'wall' ? 'bg-slate-600' : 'bg-slate-800'}`}
+          onClick$={() => (placementMode.value = 'wall')}
+        >
+          Place Wall
+        </button>
+        <button
+          class="rounded bg-emerald-500 px-4 py-2 hover:bg-emerald-600"
+          onClick$={() => (placementMode.value = 'normal')}
+        >
+          Place Node
+        </button>
+        <button class="rounded bg-red-600 px-4 py-2 hover:bg-red-700" onClick$={clearAll$}>
+          Clear All
+        </button>
+      </div>
+
+      {/* Instructions */}
+      <div class="text-sm text-gray-400">
+        Click to place nodes • Drag to move • Right-click to delete
+      </div>
+
+      {/* Container */}
+      <div
+        ref={containerRef}
+        class="relative h-[50vh] w-full cursor-crosshair overflow-hidden border-2 border-emerald-500 bg-slate-900"
+        onClick$={handleContainerClick$}
+        onMouseMove$={handleMouseMove$}
+        onMouseUp$={handleMouseUp$}
+        onMouseLeave$={handleMouseUp$}
+      >
+        {/* Draw connection lines */}
+        {showConnections.value && (
+          <svg class="pointer-events-none absolute inset-0" style="width: 100%; height: 100%;">
+            {nodes.value.map((node) => {
+              if (node.type === 'wall') return null;
+              const neighbors = findNeighbors(node, nodes.value, neighborRadius.value);
+              return neighbors.map((neighbor) => (
+                <line
+                  key={`${node.id}-${neighbor.id}`}
+                  x1={node.x}
+                  y1={node.y}
+                  x2={neighbor.x}
+                  y2={neighbor.y}
+                  stroke="rgba(34, 197, 94, 0.2)"
+                  stroke-width="1"
+                />
+              ));
+            })}
+          </svg>
+        )}
+
+        {nodes.value.map((node) => (
+          <div
+            key={node.id}
+            class={`absolute h-5 w-5 cursor-move rounded-full ${getNodeStyle(node)} transition-colors`}
+            style={{
+              left: `${node.x}px`,
+              top: `${node.y}px`,
+              transform: 'translate(-50%, -50%)'
+            }}
+            onMouseDown$={(e) => handleNodeMouseDown$(e, node.id)}
+            onContextMenu$={(e) => handleNodeContextMenu$(e, node.id)}
+            title={`${node.type} (${node.x.toFixed(0)}, ${node.y.toFixed(0)})`}
+          />
+        ))}
+
+        {/* Debug info */}
+        <div class="absolute top-2 right-2 max-h-[80%] space-y-1 overflow-y-auto bg-black/90 p-3 text-xs">
+          <div class="font-bold text-emerald-400">Distance Info</div>
+          <div>Mode: {placementMode.value}</div>
+          <div>Nodes: {nodes.value.length}</div>
+
+          {startNode.value && (
+            <div class="text-emerald-400">
+              Start: ({startNode.value.x.toFixed(0)}, {startNode.value.y.toFixed(0)})
+            </div>
+          )}
+
+          {finishNode.value && (
+            <div class="text-rose-400">
+              Finish: ({finishNode.value.x.toFixed(0)}, {finishNode.value.y.toFixed(0)})
+            </div>
+          )}
+
+          {startNode.value && finishNode.value && (
+            <>
+              <div class="mt-2 font-bold text-amber-400">
+                Euclidean: {euclidianDistance(startNode.value, finishNode.value).toFixed(3)}px
+              </div>
+              <div class="text-amber-400">Manhattan: {() => manhattanDistance(nodes.value)}px</div>
+            </>
+          )}
+
+          {nodes.value && nodes.value.length > 0 && (
+            <div class="mt-2 border-t border-gray-700 pt-2">
+              <p class="font-semibold">All Nodes:</p>
+              {nodes.value.map((n) => {
+                const neighbors = findNeighbors(n, nodes.value, neighborRadius.value);
+                return (
+                  <div key={n.id} class="mb-1 text-[10px]">
+                    {n.type} - ({n.x.toFixed(0)}, {n.y.toFixed(0)})
+                    <span class="text-gray-500"> [{neighbors.length} neighbors]</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </PageBaseContainer>
   );
 });
 
 export const head: DocumentHead = {
-  title: 'Pathfinding Visualizer · Algorithm Adventures'
+  title: 'Freeform Pathfinding · Algorithm Adventures'
 };
