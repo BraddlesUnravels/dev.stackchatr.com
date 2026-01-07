@@ -22,7 +22,7 @@ export const PageBaseContainer = component$(({ class: className, ...props }: Con
   return (
     <div
       id="id-base-page-container"
-      class={`flex-1 flex w-full mx-auto px-4 py-4 md:px-6 md:py-6 ${className ?? ''}`}
+      class={`flex-1 flex w-full mx-auto px-4 py-4 md:px-6 md:py-6 md:max-w-7xl ${className ?? ''}`}
       key="key-base-page-container"
       {...props}
     >

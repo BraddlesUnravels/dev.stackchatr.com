@@ -28,10 +28,7 @@ class MinPriorityQueue {
     while (index > 0) {
       const parent = Math.floor((index - 1) / 2);
       if (this.heap[parent][0] <= this.heap[index][0]) break;
-      [this.heap[parent], this.heap[index]] = [
-        this.heap[index],
-        this.heap[parent]
-      ];
+      [this.heap[parent], this.heap[index]] = [this.heap[index], this.heap[parent]];
       index = parent;
     }
   }
@@ -51,13 +48,15 @@ class MinPriorityQueue {
       }
       if (smallest === index) break;
 
-      [this.heap[smallest], this.heap[index]] = [
-        this.heap[index],
-        this.heap[smallest]
-      ];
+      [this.heap[smallest], this.heap[index]] = [this.heap[index], this.heap[smallest]];
       index = smallest;
     }
   }
+}
+
+export interface DijkstraResult {
+  distances: number[];
+  previous: (number | null)[];
 }
 
 /**
@@ -66,15 +65,17 @@ class MinPriorityQueue {
  *
  * @param adj   Adjacency list where adj[u] = array of [v, weight] edges
  * @param src   Source vertex index
- * @returns     Array of shortest distances from src to every vertex
+ * @returns     DijkstraResult containing the shortest distances from src to every vertex
+ *              and the previous vertex on the shortest path for each vertex.
  */
-export function dijkstra(adj: AdjacencyList, src: number): number[] {
+export function dijkstra(adj: AdjacencyList, src: number): DijkstraResult {
   const V = adj.length;
   if (src < 0 || src >= V) {
     throw new RangeError(`Source vertex ${src} is out of bounds (0..${V - 1})`);
   }
 
   const dist = Array<number>(V).fill(Infinity);
+  const previous = Array<number | null>(V).fill(null);
   const pq = new MinPriorityQueue();
 
   dist[src] = 0;
@@ -93,10 +94,11 @@ export function dijkstra(adj: AdjacencyList, src: number): number[] {
       const alt = dist[u] + w;
       if (alt < dist[v]) {
         dist[v] = alt;
+        previous[v] = u;
         pq.push([alt, v]);
       }
     }
   }
 
-  return dist;
+  return { distances: dist, previous };
 }
