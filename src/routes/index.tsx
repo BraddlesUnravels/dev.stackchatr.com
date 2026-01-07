@@ -1,12 +1,11 @@
 import { component$ } from '@builder.io/qwik';
-import { LandingHero } from '~/components/landing/hero';
 import type { DocumentHead } from '@builder.io/qwik-city';
 import { PageBaseContainer } from '~/components/layout/lib';
 
 export default component$(() => {
   return (
-    <PageBaseContainer class="">
-      <LandingHero />
+    <PageBaseContainer>
+      <h1 class="text-white">Welcome to the Skills Showcase</h1>
     </PageBaseContainer>
   );
 });
